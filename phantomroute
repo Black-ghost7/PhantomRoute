@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# ═══════════════════════════════════════════════════════════
+#  PhantomRoute — Universal Launcher
+#  Detects platform and runs the correct edition.
+#  Place this file at the root of the PhantomRoute/ folder,
+#  or copy it to /usr/local/bin/ after installing both editions.
+# ═══════════════════════════════════════════════════════════
+
+set -e
+
+# ─── Detect platform ─────────────────────────────────────────
+detect_platform() {
+    # Termux?
+    if [ -n "${PREFIX:-}" ] && [ -d "/data/data/com.termux" ]; then
+        echo "termux"; return
+    fi
+    # Kali / Debian / Ubuntu?
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "${ID:-}" in
+            kali|debian|ubuntu|linuxmint|pop)
+                echo "kali"; return ;;
+        esac
+    fi
+    # Arch?
+    if command -v pacman >/dev/null 2>&1; then
+        echo "arch"; return
+    fi
+    echo "unknown"
+}
+
+# ─── Find edition script ─────────────────────────────────────
+find_script() {
+    local platform="$1"
+    # 1. Check installed location first
+    case "$platform" in
+        termux)
+            for p in "$PREFIX/share/phantomroute/phantomroute.py"; do
+                [ -f "$p" ] && { echo "$p"; return; }
+            done ;;
+        kali|arch)
+            for p in "$HOME/.local/share/phantomroute/phantomroute.py" \
+                     "/usr/local/share/phantomroute/phantomroute.py"; do
+                [ -f "$p" ] && { echo "$p"; return; }
+            done ;;
+    esac
+    # 2. Fall back to relative folder next to this launcher
+    local self_dir
+    self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    case "$platform" in
+        termux) [ -f "$self_dir/PhantomRoute-Termux/phantomroute.py" ] \
+                && echo "$self_dir/PhantomRoute-Termux/phantomroute.py" && return ;;
+        kali|arch) [ -f "$self_dir/PhantomRoute-Kali/phantomroute.py" ] \
+                && echo "$self_dir/PhantomRoute-Kali/phantomroute.py" && return ;;
+    esac
+    echo ""
+}
+
+# ─── Main ────────────────────────────────────────────────────
+PLATFORM="$(detect_platform)"
+SCRIPT="$(find_script "$PLATFORM")"
+
+if [ -z "$SCRIPT" ]; then
+    echo "✗ PhantomRoute not found for platform: $PLATFORM"
+    echo
+    echo "  Please install first:"
+    echo "    Kali/Debian → cd PhantomRoute-Kali && ./install.sh"
+    echo "    Termux      → cd PhantomRoute-Termux && ./install.sh"
+    exit 1
+fi
+
+case "$PLATFORM" in
+    termux)
+        exec python3 "$SCRIPT" "$@"
+        ;;
+    kali|arch)
+        if [ "$EUID" -ne 0 ]; then
+            exec sudo python3 "$SCRIPT" "$@"
+        else
+            exec python3 "$SCRIPT" "$@"
+        fi
+        ;;
+    *)
+        echo "✗ Unsupported platform: $PLATFORM"
+        exit 1
+        ;;
+esac
