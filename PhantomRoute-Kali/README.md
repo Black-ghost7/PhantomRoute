@@ -1,25 +1,22 @@
-<div dir="rtl">
+# PhantomRoute — Kali / Debian / Ubuntu Edition
 
-# PhantomRoute — نسخة Kali / Debian / Ubuntu
+Tor identity rotation with a kill switch, MAC and hostname changes, and full system restoration.
 
-تدوير الهوية عبر Tor مع Kill Switch وتغيير MAC و Hostname واستعادة كاملة للنظام.
+## Requirements
 
-## المتطلبات
+- Kali, Debian or Ubuntu (or derivatives) with `systemd` and `NetworkManager`
+- root privileges (`sudo`)
+- Python 3.8+
+- Packages: `tor` `curl` `macchanger` `iptables` `iproute2`
 
-- Kali أو Debian أو Ubuntu (أو مشتقاتها)، مع `systemd` و `NetworkManager`
-- صلاحيات Root (`sudo`)
-- Python 3.8 أو أحدث
-- الحزم: `tor` `curl` `macchanger` `iptables`
-
-## التثبيت
+## Installation
 
 ```bash
 chmod +x install.sh
 ./install.sh
-source ~/.bashrc
 ```
 
-أو يدوياً:
+Or manually:
 
 ```bash
 sudo apt update
@@ -27,48 +24,46 @@ sudo apt install -y tor curl macchanger iptables iproute2 python3
 sudo python3 phantomroute.py
 ```
 
-> أثناء تثبيت `macchanger` قد يسألك: *هل تريد تغيير MAC تلقائياً عند الإقلاع؟* اختر **No**.
+> During the `macchanger` install you may be asked whether to change the MAC automatically at boot. Choose **No** (`install.sh` answers this for you).
 
-## الاستخدام
+## Usage
 
 ```bash
-phantomroute                    # تشغيل
-phantomroute --interval 30      # تدوير أسرع
-phantomroute --no-mac           # بدون تغيير MAC
-phantomroute --no-killswitch    # بدون iptables
-phantomroute --status           # عرض الحالة
-phantomroute --panic            # استعادة طارئة
+phantomroute                    # start
+phantomroute --interval 30      # faster rotation (minimum 10 s)
+phantomroute --no-mac           # do not change the MAC
+phantomroute --no-killswitch    # do not use iptables
+phantomroute --status           # show saved state
+phantomroute --panic            # emergency restore
 ```
 
-## ما الذي يحدث عند التشغيل؟
+## What happens when you start it
 
-1. حفظ الحالة الأصلية (MAC، Hostname، `resolv.conf`، `torrc`، حالة الخدمات) في `/var/lib/phantomroute/state.json` (صلاحيات root فقط).
-2. معرفة بلدك الحقيقي لاختيار بلدان خروج قريبة منه.
-3. تغيير MAC و Hostname.
-4. تفعيل Kill Switch في سلسلتين خاصتين `PHANTOMR_OUT` (IPv4) و`PHANTOMR_OUT6` (IPv6): يُسمح فقط بـ loopback و DHCP ومستخدم Tor (`debian-tor`).
-5. توجيه DNS إلى `127.0.0.1` (منفذ DNS الخاص بـ Tor).
-6. تشغيل Tor وانتظار اكتماله، ثم تدوير بلد الخروج كل `--interval` ثانية (10 كحد أدنى) دون إعادة تشغيل Tor، مع فحص الاتصال وإعادة فرض إعدادات DNS دورياً.
+1. The original state (MAC, hostname, `resolv.conf`, `torrc`, service states) is saved to `/var/lib/phantomroute/state.json` (root-only).
+2. Your real country is detected so nearby exit countries can be chosen.
+3. MAC and hostname are changed.
+4. The kill switch is enabled in two private chains, `PHANTOMR_OUT` (IPv4) and `PHANTOMR_OUT6` (IPv6). Only loopback, DHCP and the Tor user (`debian-tor`) may send traffic out.
+5. DNS is pointed to `127.0.0.1` (Tor's DNSPort).
+6. Tor is started and the tool waits until it really works, then rotates the exit country every `--interval` seconds (without restarting Tor), checking the connection and re-enforcing the DNS settings periodically.
 
-## ضبط البرامج
+## Configuring your applications
 
-الأداة لا تحوّل حركة النظام تلقائياً. اضبط برامجك على **SOCKS5 ‏`127.0.0.1:9050`** أو استخدم:
+The tool does not redirect system traffic automatically. Point your applications at **SOCKS5 `127.0.0.1:9050`** or use:
 
 ```bash
 torsocks curl https://check.torproject.org/api/ip
-proxychains4 firefox        # بعد ضبط proxychains على socks5 127.0.0.1 9050
+proxychains4 firefox        # after setting proxychains to: socks5 127.0.0.1 9050
 ```
 
-أي اتصال خارج Tor يُحجب أثناء التشغيل (ما لم تستخدم `--no-killswitch`).
+Any connection outside Tor is blocked while the tool runs (unless you use `--no-killswitch`).
 
-## الإيقاف والاستعادة
+## Stopping and restoring
 
-اضغط `Ctrl + C`. الأداة تعيد كل شيء إلى حالته الأصلية ثم تختبر DNS والاتصال.
-عند الانهيار: `sudo phantomroute --panic`.
+Press `Ctrl + C`. Everything returns to its original state and DNS/connectivity are verified.
+After a crash: `sudo phantomroute --panic`.
 
-## إزالة التثبيت
+## Uninstall
 
 ```bash
 ./uninstall.sh
 ```
-
-</div>

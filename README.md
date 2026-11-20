@@ -1,82 +1,83 @@
-<div dir="rtl">
-
 # 👻 PhantomRoute
 
-أداة لتدوير الهوية الشبكية عبر شبكة **Tor** مع استعادة مضمونة لإعدادات النظام عند الإيقاف.
-تعمل على **Kali / Debian / Ubuntu** (سطح المكتب) وعلى **Android عبر Termux**.
+🌐 **English** | [العربية](README.ar.md)
+
+Rotate your network identity through **Tor** and get your system settings back exactly as they were when you stop.
+Runs on **Kali / Debian / Ubuntu** (desktop) and on **Android via Termux**.
 
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
-[![Platform](https://img.shields.io/badge/Platform-Kali%20%7C%20Debian%20%7C%20Termux-green)](#-المنصات-المدعومة)
+[![Platform](https://img.shields.io/badge/Platform-Kali%20%7C%20Debian%20%7C%20Termux-green)](#-supported-platforms)
 
 ---
 
-## 📋 المميزات
+## 📋 Features
 
-- 🌍 **تدوير بلد الخروج (Exit Node):** اختيار بلد قريب جغرافياً من بلدك الحقيقي كل فترة زمنية (الافتراضي 60 ثانية).
-- 🔒 **تغيير MAC Address** للواجهة النشطة (نسخة Kali).
-- 🎭 **تغيير اسم الجهاز (Hostname)** إلى اسم عشوائي (نسخة Kali).
-- 🛡️ **Kill Switch** عبر سلاسل iptables/ip6tables خاصة بالأداة فقط (`PHANTOMR_OUT`) بدون المساس بباقي القواعد؛ يسمح فقط بـ loopback و DHCP وبرنامج Tor نفسه (نسخة Kali).
-- 🔐 **توجيه DNS إلى Tor** لتقليل تسريب الطلبات (نسخة Kali).
-- 💾 **حفظ الحالة الأصلية** في `state.json` لاستعادتها بعد أي انهيار عبر `--panic`.
-- 🔑 **منفذ التحكم في Tor محمي بكلمة مرور عشوائية** لكل جلسة.
-- ⚡ **تبديل بلد الخروج دون إعادة تشغيل Tor** (عبر ControlPort).
-- 📊 **تقرير جلسة** يتضمن عدد الفحوصات وعدد التدويرات والدول المستخدمة.
+- 🌍 **Exit-country rotation:** picks an exit country geographically near your real one and rotates it on a timer (default 60 s).
+- 🔒 **MAC address rotation** on the active interface (Kali edition).
+- 🎭 **Random hostname** for the session (Kali edition).
+- 🛡️ **Kill switch** using private iptables/ip6tables chains (`PHANTOMR_OUT`, `PHANTOMR_OUT6`). It never touches your other rules and lets out only loopback, DHCP and the Tor daemon itself (Kali edition).
+- 🔐 **DNS routed to Tor's DNSPort** to prevent DNS leaks (Kali edition).
+- 💾 **Original state saved** to `state.json` so `--panic` can restore everything after a crash or reboot.
+- 🔑 **Tor control port protected** by a random per-session password.
+- ⚡ **Country changes without restarting Tor** (through the control port), so circuits are not dropped.
+- 📊 **Session report** with checks, rotations and countries used.
 
 ---
 
-## 📱 المنصات المدعومة
+## 📱 Supported platforms
 
-| النسخة | المنصة | صلاحيات | MAC | Kill Switch | DNS |
+| Edition | Platform | Privileges | MAC | Kill switch | DNS |
 |---|---|---|---|---|---|
-| `PhantomRoute-Kali` | Kali / Debian / Ubuntu | Root | ✅ | ✅ | ✅ |
-| `PhantomRoute-Termux` | Android (Termux) | بدون Root | ❌ | ❌ | محدود |
+| `PhantomRoute-Kali` | Kali / Debian / Ubuntu | root | ✅ | ✅ | ✅ |
+| `PhantomRoute-Termux` | Android (Termux) | no root | ❌ | ❌ | limited |
 
 ---
 
-## 📁 هيكل المشروع
+## 📁 Project structure
 
 ```
 PhantomRoute/
-├── PhantomRoute-Kali/        # نسخة سطح المكتب
+├── PhantomRoute-Kali/        # desktop edition
+│   ├── phantomroute.py
+│   ├── install.sh
+│   ├── uninstall.sh
+│   └── README.md
+├── PhantomRoute-Termux/      # Android edition
 │   ├── phantomroute.py
 │   ├── install.sh
 │   └── README.md
-├── PhantomRoute-Termux/      # نسخة الهاتف
-│   ├── phantomroute.py
-│   ├── install.sh
-│   └── README.md
-├── phantomroute              # المشغّل الموحّد (يكتشف المنصة تلقائياً)
+├── phantomroute              # optional universal launcher
 ├── README.md
+├── README.ar.md
 └── .gitignore
 ```
 
 ---
 
-## ⬇️ التنزيل
+## ⬇️ Download
 
 ```bash
 git clone https://github.com/Black-ghost7/PhantomRoute.git
 cd PhantomRoute
 ```
 
-أو نزّل الملف المضغوط من زر **Code ← Download ZIP** ثم فك الضغط.
+Or use **Code → Download ZIP** on GitHub and extract it.
 
 ---
 
-## 🛠️ التثبيت
+## 🛠️ Installation
 
-### على Kali / Debian / Ubuntu
+### Kali / Debian / Ubuntu
 
 ```bash
 cd PhantomRoute-Kali
 chmod +x install.sh
 ./install.sh
-source ~/.bashrc
 ```
 
-يثبّت السكربت الحزم `tor curl macchanger iptables` وينشئ الأمر `phantomroute`.
+The installer installs `tor curl macchanger iptables iproute2 python3`, copies the tool to `/usr/local/share/phantomroute` (root-owned) and creates the `phantomroute` command in `/usr/local/bin`.
 
-### على Android (Termux)
+### Android (Termux)
 
 ```bash
 cd PhantomRoute-Termux
@@ -84,61 +85,71 @@ chmod +x install.sh
 ./install.sh
 ```
 
-### المشغّل الموحّد (اختياري)
+### Universal launcher (optional)
 
-سكربت التثبيت ينشئ الأمر `phantomroute` أصلاً. هذا المشغّل الموحّد اختياري، ويفيد فقط إن ثبّتّ النسخ الاثنتين على نفس الجهاز:
+`install.sh` already creates the `phantomroute` command. The universal launcher is only useful if you installed both editions on the same machine; it detects the platform and runs the right one:
 
 ```bash
 chmod +x phantomroute
-sudo cp phantomroute /usr/local/bin/        # على Termux: cp phantomroute $PREFIX/bin/
+sudo cp phantomroute /usr/local/bin/        # on Termux: cp phantomroute $PREFIX/bin/
 ```
 
 ---
 
-## 🚀 طريقة التشغيل
+## 🚀 Usage
 
 ```bash
-phantomroute                    # تشغيل بالإعدادات الافتراضية
-phantomroute --interval 30      # تدوير كل 30 ثانية
-phantomroute --no-mac           # تخطي تغيير MAC
-phantomroute --no-killswitch    # تخطي Kill Switch
-phantomroute --status           # عرض الحالة المحفوظة
-phantomroute --panic            # استعادة النظام بعد انهيار
+phantomroute                    # start with defaults
+phantomroute --interval 30      # rotate every 30 seconds
+phantomroute --no-mac           # skip MAC change
+phantomroute --no-killswitch    # skip the kill switch
+phantomroute --status           # show the saved state
+phantomroute --panic            # restore the system after a crash
 ```
 
-> ⚠️ **مهم:** الأداة **لا تحوّل كل حركة النظام تلقائياً إلى Tor**. عند تفعيل الـ Kill Switch يُحجب أي اتصال لا يمر عبر Tor، لذلك يجب ضبط برامجك على **SOCKS5 ‏`127.0.0.1:9050`** (المتصفح مثلاً) أو تشغيلها عبر `torsocks` / `proxychains`، وإلا لن يعمل الإنترنت لها أثناء التشغيل.
+> ⚠️ **Important:** PhantomRoute does **not** transparently route all system traffic through Tor. While the kill switch is on, every connection that does not go through Tor is blocked, so you must point your applications at **SOCKS5 `127.0.0.1:9050`** (e.g. your browser) or run them through `torsocks` / `proxychains`. Otherwise those applications will have no internet while the tool is running.
 >
-> الاتصالات القائمة التي لا تمر عبر Tor (تحميلات، SSH…) **تنقطع عمداً** عند التفعيل حتى لا تسرّب عنوانك الحقيقي. استخدم `--no-killswitch` إن لم ترد ذلك.
+> Existing non-Tor connections (downloads, SSH, …) are **cut on purpose** when the kill switch starts, so they cannot leak your real address. Use `--no-killswitch` if you do not want this.
 
-اضغط **Ctrl + C** في أي وقت لإيقاف الأداة (أو أغلق الطرفية)، وستقوم تلقائياً بـ:
+Press **Ctrl + C** (or close the terminal) at any time. The tool will automatically:
 
-1. إزالة قاعدة الـ Kill Switch الخاصة بها فقط.
-2. استعادة `resolv.conf` وخدمة `systemd-resolved`.
-3. إيقاف Tor إذا لم يكن يعمل قبل التشغيل، واستعادة `torrc`.
-4. استعادة MAC Address و Hostname الأصليين.
-5. اختبار الاتصال والتأكد من أن الإنترنت يعمل.
+1. Remove its own kill-switch chains (only those).
+2. Restore `resolv.conf` and `systemd-resolved`.
+3. Stop Tor if it was not running before, and restore `torrc`.
+4. Restore the original MAC address and hostname.
+5. Verify that DNS and outbound connectivity work.
 
-### الخيارات
+### Options
 
-| الخيار | الوصف |
+| Option | Description |
 |---|---|
-| `--interval N` | عدد الثواني بين كل تدوير (Kali: 60، Termux: 90) |
-| `--no-mac` | عدم تغيير MAC (Kali) |
-| `--no-killswitch` | عدم تفعيل iptables (Kali) |
-| `--status` | طباعة محتوى `state.json` |
-| `--panic` | تنفيذ الاستعادة الطارئة |
+| `--interval N` | Seconds between rotations (Kali: 60, Termux: 90; minimum 10) |
+| `--no-mac` | Do not change the MAC address (Kali) |
+| `--no-killswitch` | Do not enable iptables rules (Kali) |
+| `--status` | Print the contents of `state.json` |
+| `--panic` | Run the emergency restoration |
+
+### Using applications through Tor
+
+```bash
+torsocks curl https://check.torproject.org/api/ip
+curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
+proxychains4 firefox        # after setting proxychains to: socks5 127.0.0.1 9050
+```
+
+For Firefox: *Settings → Network Settings → Manual proxy*, set **SOCKS Host** `127.0.0.1`, **Port** `9050`, choose **SOCKS v5** and enable **Proxy DNS when using SOCKS v5**.
 
 ---
 
-## 🆘 استعادة النظام بعد انهيار
+## 🆘 Recovering after a crash
 
-إذا انقطع الإنترنت بعد إغلاق الأداة بشكل غير طبيعي (إعادة تشغيل، انقطاع كهرباء…):
+If your internet is dead after the tool was killed (reboot, power loss, `kill -9`, …):
 
 ```bash
 sudo phantomroute --panic
 ```
 
-وإذا لم ينفع، نفّذ يدوياً:
+If that is not enough, remove the rules manually:
 
 ```bash
 sudo iptables  -D OUTPUT -j PHANTOMR_OUT  && sudo iptables  -F PHANTOMR_OUT  && sudo iptables  -X PHANTOMR_OUT
@@ -149,49 +160,61 @@ sudo systemctl restart NetworkManager
 
 ---
 
-## 📂 ملفات تنشئها الأداة
+## 🧪 Testing safely
 
-| المسار | الغرض |
+Test inside a virtual machine first, with a snapshot and **NAT** networking (not bridged):
+
+1. `phantomroute --no-mac --no-killswitch` and check `curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip` returns `"IsTor":true`.
+2. Stop with Ctrl + C and confirm `resolv.conf`, hostname and Tor are back to normal.
+3. Add MAC/hostname changes, then the kill switch.
+4. Run start/stop twice in a row.
+5. Kill the process (`sudo pkill -9 -f phantomroute.py`) and recover with `--panic`.
+
+---
+
+## 📂 Files created by the tool
+
+| Path | Purpose |
 |---|---|
-| `/var/lib/phantomroute/state.json` (Kali) | الحالة الأصلية للنظام قبل التشغيل |
-| `~/.config/phantomroute/state.json` (Termux) | الحالة الأصلية قبل التشغيل |
-| `~/phantomroute_report.txt` | تقرير الجلسة |
+| `/var/lib/phantomroute/state.json` (Kali) | Original system state before the session |
+| `~/.config/phantomroute/state.json` (Termux) | Original state before the session |
+| `~/phantomroute_report.txt` | Session report |
 
 ---
 
-## ⚠️ حدود مهمة
+## ⚠️ Limitations
 
-- الأداة **لا تضمن إخفاء الهوية بالكامل**؛ بصمة المتصفح وتسجيل الدخول إلى حساباتك وسلوكك على الشبكة تكشفك بغض النظر عن Tor.
-- تقييد بلد الخروج وتدويره بشكل متكرر قد يقلل من مناسبة Tor لبعض الاستخدامات؛ لا تعتمد عليها في سيناريوهات تهديد عالية.
-- بعض المواقع تحظر عناوين Tor.
-- تعديل `iptables` و `resolv.conf` و MAC يتطلب صلاحيات Root ويؤثر على الشبكة بالكامل أثناء التشغيل.
-
----
-
-## 🧯 تنبيه وإخلاء مسؤولية
-
-هذه الأداة مخصصة **للأغراض التعليمية واختبار الأمان الشخصي والخصوصية فقط**، وعلى أجهزة وشبكات تملكها أو لديك إذن صريح باختبارها.
-المستخدم هو المسؤول الأول عن أي استخدام غير قانوني، والمطوّر غير مسؤول عن أي ضرر ناتج عن سوء الاستخدام.
+- This tool does **not** guarantee anonymity. Browser fingerprinting, logging in to your own accounts and your behaviour online can identify you regardless of Tor.
+- Restricting and frequently rotating exit countries may weaken Tor's usefulness for some use cases. Do not rely on it for high-risk threat models.
+- Some websites block Tor exit nodes.
+- Changing `iptables`, `resolv.conf` and the MAC address requires root and affects the whole machine while the tool runs.
 
 ---
 
-## 📝 سجل التغييرات
+## 📝 Changelog
 
 **v1.1**
-- إصلاح: الأداة كانت ترفض التشغيل للمرة الثانية بعد أول إيقاف نظيف.
-- إصلاح: الـ Kill Switch كان يحجب Tor نفسه؛ أصبح يسمح لمستخدم Tor ولـ loopback فقط، ويغطي IPv6.
-- أمان: منفذ التحكم في Tor صار محمياً بكلمة مرور عشوائية بدل الدخول المفتوح.
-- تحسين: انتظار اكتمال اتصال Tor فعلياً بدل `sleep`، وتبديل البلد دون إعادة تشغيل.
-- تحسين: إعادة Tor و`torrc` لحالتهما الأصلية عند الخروج، والتعامل مع إغلاق الطرفية (SIGHUP).
-- تحسين: تقرير الجلسة يُكتب فعلاً، وحالة الاستعادة تُحفظ في مسار ثابت `/var/lib/phantomroute`.
-- التثبيت صار على مستوى النظام (`/usr/local`) كي لا يُنفَّذ كود بصلاحيات root من مجلد قابل للتعديل.
+- Fix: the tool refused to start a second time after a clean stop.
+- Fix: the kill switch blocked Tor itself; it now allows only the Tor user, loopback and DHCP, and also covers IPv6.
+- Security: the Tor control port is now protected by a random per-session password instead of open access.
+- Improvement: waits until Tor is actually working instead of a fixed `sleep`; country changes no longer restart Tor.
+- Improvement: Tor and `torrc` are returned to their original state on exit; terminal close (SIGHUP) is handled.
+- Improvement: the session report is actually written; restore state lives in the fixed path `/var/lib/phantomroute`.
+- Install system-wide (`/usr/local`) so code running as root is never loaded from a user-writable folder.
 
-## 🤝 المساهمة
+---
 
-الإصدارات والاقتراحات عبر **Issues** و **Pull Requests** مرحّب بها.
+## 🧯 Disclaimer
 
-## 👤 المطوّر
+This tool is intended for **educational purposes and personal privacy/security testing only**, on systems and networks you own or are explicitly authorized to test.
+The user is solely responsible for any illegal use. The author accepts no liability for damage resulting from misuse.
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome.
+
+## 👤 Author
 
 **Black-ghost7** — [GitHub](https://github.com/Black-ghost7)
-
-</div>

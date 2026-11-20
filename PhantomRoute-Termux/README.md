@@ -1,15 +1,13 @@
-<div dir="rtl">
+# PhantomRoute — Termux (Android) Edition
 
-# PhantomRoute — نسخة Termux (Android)
+Tor exit-country rotation on Android. No root required.
 
-تدوير بلد الخروج في Tor على أندرويد بدون Root.
+## Requirements
 
-## المتطلبات
+- **Termux** (preferably from F-Droid)
+- Internet connection
 
-- تطبيق **Termux** (يُفضّل من F-Droid)
-- اتصال بالإنترنت
-
-## التثبيت
+## Installation
 
 ```bash
 pkg update -y && pkg install -y git
@@ -19,32 +17,30 @@ chmod +x install.sh
 ./install.sh
 ```
 
-## الاستخدام
+## Usage
 
 ```bash
-phantomroute                    # تشغيل
-phantomroute --interval 60      # تدوير كل 60 ثانية
-phantomroute --status           # عرض الحالة
-phantomroute --panic            # استعادة بعد انهيار
+phantomroute                    # start
+phantomroute --interval 60      # rotate every 60 seconds (minimum 10)
+phantomroute --status           # show saved state
+phantomroute --panic            # recover after a crash
 ```
 
-## توجيه أوامر عبر Tor
+## Routing commands through Tor
 
-بعد تشغيل الأداة يعمل Tor على `127.0.0.1:9050`:
+While the tool runs, Tor listens on `127.0.0.1:9050`:
 
 ```bash
 pkg install torsocks
 torsocks curl https://check.torproject.org/api/ip
 
-# أو
+# or
 curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip
 ```
 
-## الفروقات عن نسخة Kali
+## Differences from the Kali edition
 
-- لا يوجد `systemd`: يعمل Tor كعملية فرعية، ويُوقف ويُستعاد `torrc` عند الخروج.
-- لا يوجد Kill Switch (قيود أندرويد): التطبيقات **لا تمر عبر Tor تلقائياً**، فقط ما توجّهه أنت.
-- لا يوجد تغيير لـ MAC أو Hostname.
-- حماية DNS محدودة بدون Root.
-
-</div>
+- No `systemd`: Tor runs as a child process, and `torrc` is restored on exit.
+- No kill switch (Android restriction): apps are **not** routed through Tor automatically, only what you point at the proxy.
+- No MAC or hostname changes.
+- DNS leak protection is limited without root.
