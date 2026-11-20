@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=PhantomRoute
+GenericName=Tor Identity Rotation
+Comment=Rotate your network identity through Tor with a kill switch and safe restore
+Exec=bash -c "/usr/local/bin/phantomroute; echo; read -r -p 'Press Enter to close...' _"
+Icon=phantomroute
+Terminal=true
+Categories=Network;Security;System;
+Keywords=tor;privacy;anonymity;proxy;kali;phantom;
+StartupNotify=false

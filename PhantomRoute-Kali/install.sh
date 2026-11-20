@@ -36,13 +36,58 @@ exec python3 "$APP_DIR/phantomroute.py" "\$@"
 LAUNCH
 $SUDO chmod 755 "$BIN"
 
+# Short commands:  phantom  and  phr
+for name in phantom phr; do
+    target="/usr/local/bin/$name"
+    existing="$(command -v "$name" 2>/dev/null || true)"
+    if [ -n "$existing" ] && [ "$(readlink -f "$existing")" != "$(readlink -f "$BIN")" ]; then
+        echo "[!] '$name' already exists ($existing) — skipping that shortcut"
+    else
+        $SUDO ln -sf "$BIN" "$target"
+    fi
+done
+
+# ─── Desktop icon + application-menu entry ───────────────────
+ICON_SRC="$SCRIPT_DIR/icons/hicolor"
+DESKTOP_SRC="$SCRIPT_DIR/phantomroute.desktop"
+if [ -d "$ICON_SRC" ] && [ -f "$DESKTOP_SRC" ]; then
+    echo "[*] Installing icon and application-menu entry..."
+    while IFS= read -r f; do
+        $SUDO install -D -m 644 "$f" "/usr/share/icons/hicolor/${f#"$ICON_SRC"/}"
+    done < <(find "$ICON_SRC" -type f -name '*.png')
+    $SUDO install -D -m 644 "$DESKTOP_SRC" /usr/share/applications/phantomroute.desktop
+    command -v gtk-update-icon-cache  >/dev/null 2>&1 && $SUDO gtk-update-icon-cache -f -t /usr/share/icons/hicolor >/dev/null 2>&1 || true
+    command -v update-desktop-database >/dev/null 2>&1 && $SUDO update-desktop-database /usr/share/applications >/dev/null 2>&1 || true
+
+    # Optional shortcut on the user's desktop (the user who ran the installer)
+    if [ "$(id -u)" -eq 0 ]; then TARGET_USER="${SUDO_USER:-}"; else TARGET_USER="$(id -un)"; fi
+    if [ -n "$TARGET_USER" ]; then
+        as_user() { if [ "$(id -u)" -eq 0 ]; then runuser -u "$TARGET_USER" -- "$@"; else "$@"; fi; }
+        T_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+        DESK="$(as_user xdg-user-dir DESKTOP 2>/dev/null || true)"
+        { [ -n "$DESK" ] && [ -d "$DESK" ]; } || DESK="$T_HOME/Desktop"
+        if [ -d "$DESK" ]; then
+            SHORTCUT="$DESK/phantomroute.desktop"
+            as_user cp /usr/share/applications/phantomroute.desktop "$SHORTCUT"
+            as_user chmod +x "$SHORTCUT"
+            # mark as trusted (GNOME / Xfce) — harmless if gio is unavailable
+            as_user gio set "$SHORTCUT" metadata::trusted true >/dev/null 2>&1 || true
+            as_user gio set "$SHORTCUT" metadata::xfce-exe-checksum "$(sha256sum "$SHORTCUT" | cut -d' ' -f1)" >/dev/null 2>&1 || true
+            echo "[✓] Desktop shortcut: $SHORTCUT"
+            echo "    (if it shows a warning icon: right-click → Allow Launching)"
+        fi
+    fi
+fi
+
 echo
 echo "╔══════════════════════════════════════════════════╗"
 echo "║  ✓ PhantomRoute installed successfully           ║"
 echo "║                                                  ║"
-echo "║  Usage:                                          ║"
-echo "║    phantomroute             # Start              ║"
-echo "║    phantomroute --panic     # Recover crash      ║"
-echo "║    phantomroute --status    # Show state         ║"
-echo "║    phantomroute --help      # All options        ║"
+echo "║  Click the PhantomRoute icon in the app menu,    ║"
+echo "║  or just type:                                   ║"
+echo "║    phantom            # interactive menu        ║"
+echo "║    phr                # same, even shorter      ║"
+echo "║    phantom --start    # start immediately       ║"
+echo "║    phantom --panic    # recover after a crash   ║"
+echo "║    phantom --help     # all options             ║"
 echo "╚══════════════════════════════════════════════════╝"

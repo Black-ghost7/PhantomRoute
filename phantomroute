@@ -39,8 +39,7 @@ find_script() {
                 [ -f "$p" ] && { echo "$p"; return; }
             done ;;
         kali|arch)
-            for p in "$HOME/.local/share/phantomroute/phantomroute.py" \
-                     "/usr/local/share/phantomroute/phantomroute.py"; do
+            for p in "/usr/local/share/phantomroute/phantomroute.py"; do
                 [ -f "$p" ] && { echo "$p"; return; }
             done ;;
     esac

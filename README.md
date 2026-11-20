@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="assets/logo.png" alt="PhantomRoute logo" width="200">
+</p>
+
+<p align="center">
+  <img src="assets/banner.svg" alt="PhantomRoute" width="640">
+</p>
+
 # 👻 PhantomRoute
 
 🌐 **English** | [العربية](README.ar.md)
@@ -12,6 +20,9 @@ Runs on **Kali / Debian / Ubuntu** (desktop) and on **Android via Termux**.
 
 ## 📋 Features
 
+- 🖥️ **Interactive menu and live dashboard** in the terminal, with single-key shortcuts.
+- 🖼️ **Desktop icon:** appears in the applications menu (and on your desktop) with the PhantomRoute logo, like other Kali tools.
+- ⌨️ **Short commands:** just type `phantom` (or `phr`).
 - 🌍 **Exit-country rotation:** picks an exit country geographically near your real one and rotates it on a timer (default 60 s).
 - 🔒 **MAC address rotation** on the active interface (Kali edition).
 - 🎭 **Random hostname** for the session (Kali edition).
@@ -39,6 +50,8 @@ Runs on **Kali / Debian / Ubuntu** (desktop) and on **Android via Termux**.
 PhantomRoute/
 ├── PhantomRoute-Kali/        # desktop edition
 │   ├── phantomroute.py
+│   ├── phantomroute.desktop  # application-menu entry
+│   ├── icons/                # icon in all standard sizes
 │   ├── install.sh
 │   ├── uninstall.sh
 │   └── README.md
@@ -46,6 +59,7 @@ PhantomRoute/
 │   ├── phantomroute.py
 │   ├── install.sh
 │   └── README.md
+├── assets/                   # logo, icon, screenshots, social-preview image
 ├── phantomroute              # optional universal launcher
 ├── README.md
 ├── README.ar.md
@@ -75,7 +89,9 @@ chmod +x install.sh
 ./install.sh
 ```
 
-The installer installs `tor curl macchanger iptables iproute2 python3`, copies the tool to `/usr/local/share/phantomroute` (root-owned) and creates the `phantomroute` command in `/usr/local/bin`.
+The installer installs `tor curl macchanger iptables iproute2 python3`, copies the tool to `/usr/local/share/phantomroute` (root-owned) and creates the commands **`phantom`**, **`phr`** and `phantomroute` in `/usr/local/bin`. They all do the same thing; `sudo` is added for you.
+
+It also installs the **icon and an application-menu entry**: search for *PhantomRoute* in your applications menu and click it to open the tool in a terminal. If your desktop folder exists, a shortcut is placed there too (if it shows a warning icon, right-click it → **Allow Launching** once).
 
 ### Android (Termux)
 
@@ -85,9 +101,11 @@ chmod +x install.sh
 ./install.sh
 ```
 
+Android has no desktop-style application menu, so there is no icon entry for Termux. Install the free **Termux:Widget** app (F-Droid), add its widget to your home screen, and you get a one-tap **PhantomRoute** shortcut (the installer creates it).
+
 ### Universal launcher (optional)
 
-`install.sh` already creates the `phantomroute` command. The universal launcher is only useful if you installed both editions on the same machine; it detects the platform and runs the right one:
+`install.sh` already creates the `phantom`, `phr` and `phantomroute` commands. The universal launcher is only useful if you installed both editions on the same machine; it detects the platform and runs the right one:
 
 ```bash
 chmod +x phantomroute
@@ -98,20 +116,55 @@ sudo cp phantomroute /usr/local/bin/        # on Termux: cp phantomroute $PREFIX
 
 ## 🚀 Usage
 
+Just type the name:
+
 ```bash
-phantomroute                    # start with defaults
-phantomroute --interval 30      # rotate every 30 seconds
-phantomroute --no-mac           # skip MAC change
-phantomroute --no-killswitch    # skip the kill switch
-phantomroute --status           # show the saved state
-phantomroute --panic            # restore the system after a crash
+phantom
+```
+
+(`phr` works too, and so does the full name `phantomroute`.) With no options you get the interactive menu:
+
+<p align="center">
+  <img src="assets/menu.svg" alt="PhantomRoute main menu" width="640">
+</p>
+
+Choose **1** to start. While the tool is running you get a live dashboard:
+
+<p align="center">
+  <img src="assets/dashboard.svg" alt="PhantomRoute live dashboard" width="640">
+</p>
+
+### Keyboard shortcuts (dashboard)
+
+| Key | Action |
+|---|---|
+| `n` | New identity now (new Tor circuits, same country) |
+| `r` | Rotate to a new random nearby country now |
+| `c` | Choose the exit country yourself (Enter = back to automatic) |
+| `p` | Pause / resume the automatic rotation timer |
+| `q` | Quit safely — everything is restored |
+| `Ctrl + C` | Same as `q` |
+
+### Command-line mode
+
+Any option skips the menu, which is handy for scripts:
+
+```bash
+phantom --start                 # start immediately with defaults
+phantom --country DE            # fix the exit country
+phantom --interval 30           # rotate every 30 seconds
+phantom --no-mac                # skip MAC change
+phantom --no-hostname           # skip hostname change
+phantom --no-killswitch         # skip the kill switch
+phantom --status                # show the saved state
+phantom --panic                 # restore the system after a crash
 ```
 
 > ⚠️ **Important:** PhantomRoute does **not** transparently route all system traffic through Tor. While the kill switch is on, every connection that does not go through Tor is blocked, so you must point your applications at **SOCKS5 `127.0.0.1:9050`** (e.g. your browser) or run them through `torsocks` / `proxychains`. Otherwise those applications will have no internet while the tool is running.
 >
 > Existing non-Tor connections (downloads, SSH, …) are **cut on purpose** when the kill switch starts, so they cannot leak your real address. Use `--no-killswitch` if you do not want this.
 
-Press **Ctrl + C** (or close the terminal) at any time. The tool will automatically:
+Press **q** or **Ctrl + C** (or close the terminal) at any time. The tool will automatically:
 
 1. Remove its own kill-switch chains (only those).
 2. Restore `resolv.conf` and `systemd-resolved`.
@@ -123,8 +176,11 @@ Press **Ctrl + C** (or close the terminal) at any time. The tool will automatica
 
 | Option | Description |
 |---|---|
+| `--start` | Start immediately (skip the menu) |
+| `--country CC` | Fix the exit country (2-letter code, e.g. `DE`) |
 | `--interval N` | Seconds between rotations (Kali: 60, Termux: 90; minimum 10) |
 | `--no-mac` | Do not change the MAC address (Kali) |
+| `--no-hostname` | Do not change the hostname (Kali) |
 | `--no-killswitch` | Do not enable iptables rules (Kali) |
 | `--status` | Print the contents of `state.json` |
 | `--panic` | Run the emergency restoration |
@@ -146,7 +202,7 @@ For Firefox: *Settings → Network Settings → Manual proxy*, set **SOCKS Host*
 If your internet is dead after the tool was killed (reboot, power loss, `kill -9`, …):
 
 ```bash
-sudo phantomroute --panic
+sudo phantom --panic
 ```
 
 If that is not enough, remove the rules manually:
@@ -164,7 +220,7 @@ sudo systemctl restart NetworkManager
 
 Test inside a virtual machine first, with a snapshot and **NAT** networking (not bridged):
 
-1. `phantomroute --no-mac --no-killswitch` and check `curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip` returns `"IsTor":true`.
+1. `phantom --start --no-mac --no-killswitch` and check `curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip` returns `"IsTor":true`.
 2. Stop with Ctrl + C and confirm `resolv.conf`, hostname and Tor are back to normal.
 3. Add MAC/hostname changes, then the kill switch.
 4. Run start/stop twice in a row.
@@ -192,6 +248,15 @@ Test inside a virtual machine first, with a snapshot and **NAT** networking (not
 ---
 
 ## 📝 Changelog
+
+**v1.2**
+- New: interactive main menu (start, choose country, settings, status, panic).
+- New: live dashboard with keyboard shortcuts (`n` `r` `c` `p` `q`).
+- New: short commands `phantom` and `phr`; `--start`, `--country` and `--no-hostname` options.
+- New: redesigned banner; screenshots in the README.
+- New: logo, desktop icon and application-menu entry (Kali); Termux:Widget shortcut (Termux).
+- Improvement: the dashboard adapts to narrow screens (phones).
+- Security: the universal launcher no longer runs code from a user-writable folder as root.
 
 **v1.1**
 - Fix: the tool refused to start a second time after a clean stop.

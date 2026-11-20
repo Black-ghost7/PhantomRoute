@@ -30,14 +30,33 @@ exec python3 "$APP_DIR/phantomroute.py" "\$@"
 EOF
 chmod +x "$BIN_DIR/phantomroute"
 
+# Short commands:  phantom  and  phr
+for name in phantom phr; do
+    existing="$(command -v "$name" 2>/dev/null || true)"
+    if [ -n "$existing" ] && [ "$(readlink -f "$existing")" != "$(readlink -f "$BIN_DIR/phantomroute")" ]; then
+        echo "[!] '$name' already exists ($existing) — skipping that shortcut"
+    else
+        ln -sf "$BIN_DIR/phantomroute" "$BIN_DIR/$name"
+    fi
+done
+
+# Termux:Widget shortcut (optional app from F-Droid; Android has no desktop-style menu icons)
+mkdir -p "$HOME/.shortcuts"
+cat > "$HOME/.shortcuts/PhantomRoute" << EOF
+#!/data/data/com.termux/files/usr/bin/bash
+exec "$BIN_DIR/phantomroute"
+EOF
+chmod 700 "$HOME/.shortcuts/PhantomRoute"
+
 echo
 echo "╔══════════════════════════════════════════════════╗"
-echo "║  ✓ PhantomRoute installed on Termux             ║"
+echo "║  ✓ PhantomRoute installed on Termux              ║"
 echo "║                                                  ║"
-echo "║  Usage:                                          ║"
-echo "║    phantomroute             # Start              ║"
-echo "║    phantomroute --panic     # Recover crash      ║"
-echo "║    phantomroute --status    # Show state         ║"
+echo "║  Just type:                                      ║"
+echo "║    phantom            # interactive menu        ║"
+echo "║    phr                # same, even shorter      ║"
+echo "║    phantom --start    # start immediately       ║"
+echo "║    phantom --panic    # recover after a crash   ║"
 echo "║                                                  ║"
 echo "║  To route apps through Tor:                      ║"
 echo "║    curl --socks5-hostname 127.0.0.1:9050 URL     ║"

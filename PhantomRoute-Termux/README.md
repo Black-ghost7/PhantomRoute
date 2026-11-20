@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/banner.svg" alt="PhantomRoute" width="640">
+</p>
+
 # PhantomRoute — Termux (Android) Edition
 
 Tor exit-country rotation on Android. No root required.
@@ -17,14 +21,25 @@ chmod +x install.sh
 ./install.sh
 ```
 
+## One-tap shortcut (optional)
+
+Android has no desktop-style application menu. Install the free **Termux:Widget** app from F-Droid, add its widget to your home screen, and the **PhantomRoute** shortcut created by `install.sh` appears in it.
+
 ## Usage
 
+Just type the name (`phr` is an even shorter alias):
+
 ```bash
-phantomroute                    # start
-phantomroute --interval 60      # rotate every 60 seconds (minimum 10)
-phantomroute --status           # show saved state
-phantomroute --panic            # recover after a crash
+phantom                         # interactive menu
+phantom --start                 # start immediately
+phantom --country DE            # fix the exit country
+phantom --interval 60           # rotate every 60 seconds (minimum 10)
+phantom --status                # show saved state
+phantom --panic                 # recover after a crash
 ```
+
+Dashboard keys: `n` new identity · `r` rotate country · `c` choose country · `p` pause · `q` quit.
+The layout adapts to the narrow phone screen automatically.
 
 ## Routing commands through Tor
 

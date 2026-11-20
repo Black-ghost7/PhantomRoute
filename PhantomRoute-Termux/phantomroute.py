@@ -27,7 +27,9 @@ from pathlib import Path
 from datetime import datetime
 
 APP        = "PhantomRoute"
-VERSION    = "1.1"
+VERSION    = "1.2"
+EDITION    = "Termux"
+FEATURES   = set()          # no MAC / hostname / kill switch without root
 PREFIX     = Path(os.environ.get("PREFIX", "/data/data/com.termux/files/usr"))
 STATE_DIR  = Path.home() / ".config" / "phantomroute"
 STATE_FILE = STATE_DIR / "state.json"
@@ -216,8 +218,8 @@ def set_exit_country(country):
         ok = configure_tor(country)
     return ok
 
-def rotate(real, first=False):
-    target = random.choice(NEARBY.get(real, DEFAULTS))
+def rotate(real, cfg, first=False):
+    target = pick_country(real, cfg)
     print(col(M, f"⟳ Target: {target}"))
     if first: configure_tor(target)
     else:     set_exit_country(target)
@@ -268,6 +270,10 @@ def on_signal(sig, frame):
     global _exiting
     if _exiting: return
     _exiting = True
+    stop_evt.set()
+    restore_terminal()
+    if tor_lock.acquire(timeout=35):
+        tor_lock.release()
     safe_cleanup()
     write_report()
     sys.exit(0)
@@ -276,45 +282,360 @@ signal.signal(signal.SIGINT, on_signal)
 signal.signal(signal.SIGTERM, on_signal)
 signal.signal(signal.SIGHUP, on_signal)
 
-# ─── Banner ────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+#  Interactive UI: banner, main menu, live dashboard, keyboard keys.
+#  Standard library only. Identical in both editions.
+# ═══════════════════════════════════════════════════════════════
+import re
+import threading
+import select
+import atexit
+try:
+    import termios, tty
+except ImportError:                      # not a POSIX terminal
+    termios = tty = None
+
+DIM = '\033[2m'
+GRADIENT = (87, 51, 45, 39, 33, 27)
+
+LOGO = [
+    "██████╗ ██╗  ██╗ █████╗ ███╗   ██╗████████╗ ██████╗ ███╗   ███╗",
+    "██╔══██╗██║  ██║██╔══██╗████╗  ██║╚══██╔══╝██╔═══██╗████╗ ████║",
+    "██████╔╝███████║███████║██╔██╗ ██║   ██║   ██║   ██║██╔████╔██║",
+    "██╔═══╝ ██╔══██║██╔══██║██║╚██╗██║   ██║   ██║   ██║██║╚██╔╝██║",
+    "██║     ██║  ██║██║  ██║██║ ╚████║   ██║   ╚██████╔╝██║ ╚═╝ ██║",
+    "╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═════╝ ╚═╝     ╚═╝",
+]
+
+COUNTRY_NAMES = {
+    "AE":"UAE","AT":"Austria","BE":"Belgium","BH":"Bahrain","CA":"Canada",
+    "CH":"Switzerland","CY":"Cyprus","DE":"Germany","DK":"Denmark","DZ":"Algeria",
+    "EG":"Egypt","ES":"Spain","FI":"Finland","FR":"France","GB":"United Kingdom",
+    "GR":"Greece","IE":"Ireland","IQ":"Iraq","IT":"Italy","JO":"Jordan",
+    "KW":"Kuwait","LB":"Lebanon","LY":"Libya","MA":"Morocco","MX":"Mexico",
+    "NL":"Netherlands","NO":"Norway","OM":"Oman","PT":"Portugal","QA":"Qatar",
+    "SA":"Saudi Arabia","SE":"Sweden","SY":"Syria","TN":"Tunisia","TR":"Turkey",
+    "US":"United States","YE":"Yemen",
+}
+
+class Cfg:
+    """Session settings (menu / command-line)."""
+    def __init__(self, interval):
+        self.interval   = interval
+        self.mac        = "mac" in FEATURES
+        self.hostname   = "hostname" in FEATURES
+        self.killswitch = "killswitch" in FEATURES
+        self.country    = None            # None = automatic (nearby countries)
+
+stop_evt = threading.Event()
+tor_lock = threading.Lock()
+_saved_term = None
+
+def c256(n, t): return f"\033[38;5;{n}m{t}{N}"
+
+def term_width():
+    return shutil.get_terminal_size((80, 24)).columns
+
+def banner_lines():
+    if term_width() >= 66:
+        lines = [c256(GRADIENT[i], row) for i, row in enumerate(LOGO)]
+        lines.append(col(M, "   R  O  U  T  E") + col(W, f"   v{VERSION} · {EDITION} Edition"))
+        lines.append(col(DIM, "   Tor identity rotation · safe state restoration"))
+    else:                                 # narrow screens (phones)
+        title = f" PHANTOMROUTE v{VERSION} · {EDITION} "
+        lines = [col(C, "╔" + "═" * len(title) + "╗"),
+                 col(C, "║") + col(W, title) + col(C, "║"),
+                 col(C, "╚" + "═" * len(title) + "╝")]
+    return lines
+
+def clear_screen():
+    sys.stdout.write("\033[H\033[2J"); sys.stdout.flush()
+
 def banner():
-    os.system("clear")
-    print(col(C, "╔══════════════════════════════════════════╗"))
-    print(col(C, "║                                          ║"))
-    print(col(C, "║      ██████╗ ██╗  ██╗ █████╗ ███╗   ██╗ ║"))
-    print(col(C, "║      ██╔══██╗██║  ██║██╔══██╗████╗  ██║ ║"))
-    print(col(C, "║      ██████╔╝███████║███████║██╔██╗ ██║ ║"))
-    print(col(C, "║      ██╔═══╝ ██╔══██║██╔══██║██║╚██╗██║ ║"))
-    print(col(C, "║      ██║     ██║  ██║██║  ██║██║ ╚████║ ║"))
-    print(col(C, "║      ╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ║"))
-    print(col(C, "║                                          ║"))
-    print(col(C, f"║      R O U T E   v{VERSION}  (Termux)      ║"))
-    print(col(C, "╚══════════════════════════════════════════╝"))
-    print()
+    print("\n".join(banner_lines())); print()
 
-# ─── Main ──────────────────────────────────────────────────────
-def main():
-    parser = argparse.ArgumentParser(prog=APP)
-    parser.add_argument("--panic", action="store_true", help="Recover crashed session")
-    parser.add_argument("--status", action="store_true", help="Show state")
-    parser.add_argument("--interval", type=int, default=CHANGE_INTERVAL,
-                        help="Seconds between rotations (min 10)")
-    args = parser.parse_args()
-    args.interval = max(10, args.interval)
+# ─── Terminal mode (single-key input) ──────────────────────────
+def term_cbreak():
+    global _saved_term
+    if termios and sys.stdin.isatty() and _saved_term is None:
+        fd = sys.stdin.fileno()
+        _saved_term = termios.tcgetattr(fd)
+        tty.setcbreak(fd)                 # Ctrl+C still works
+        sys.stdout.write("\033[?25l"); sys.stdout.flush()
 
-    if args.panic:
-        if state.load() and state.get("cleanup_pending"):
-            print(col(Y, "Recovering..."))
-            run(["pkill", "-f", f"{TOR_BIN} -f {TORRC}"])   # leftover tor from the crashed session
-            safe_cleanup()
-        print(col(G, "Done."))
-        return
+def restore_terminal():
+    global _saved_term
+    if _saved_term is not None:
+        try: termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, _saved_term)
+        except Exception: pass
+        _saved_term = None
+        try: sys.stdout.write("\033[?25h"); sys.stdout.flush()
+        except Exception: pass
 
-    if args.status:
-        if state.load(): print(json.dumps(state.d, indent=2))
-        else: print("No state.")
-        return
+atexit.register(restore_terminal)
 
+def read_key(timeout):
+    if not sys.stdin.isatty():
+        time.sleep(timeout); return ""
+    try:
+        r, _, _ = select.select([sys.stdin], [], [], timeout)
+        if r:
+            return os.read(sys.stdin.fileno(), 1).decode(errors="ignore")
+    except (OSError, ValueError):
+        pass
+    return ""
+
+# ─── Country selection ─────────────────────────────────────────
+def pick_country(real, cfg):
+    return cfg.country or random.choice(NEARBY.get(real, DEFAULTS))
+
+def ask_country(cfg):
+    """Prompt for an exit country. Returns True if cfg.country changed."""
+    clear_screen(); banner()
+    print(col(W, "  Choose exit country\n"))
+    items = [f"{c}  {n}" for c, n in sorted(COUNTRY_NAMES.items())]
+    per_row = max(1, (term_width() - 2) // 24)
+    for i in range(0, len(items), per_row):
+        print("  " + "".join(col(Y, it[:2]) + it[2:].ljust(22) for it in items[i:i + per_row]))
+    print(col(DIM, "\n  Any 2-letter code works. Enter = automatic (nearby countries)."))
+    try:
+        v = input(col(W, "\n  Country code » ")).strip().upper()
+    except (EOFError, KeyboardInterrupt):
+        return False
+    if v == "":
+        changed = cfg.country is not None
+        cfg.country = None
+        return changed
+    if len(v) == 2 and v.isalpha():
+        cfg.country = v
+        return True
+    print(col(R, "  ✗ Invalid code")); time.sleep(1.2)
+    return False
+
+# ─── Main menu ─────────────────────────────────────────────────
+def settings_summary(cfg):
+    parts = [f"interval {cfg.interval}s"]
+    if "mac" in FEATURES:        parts.append("MAC " + ("on" if cfg.mac else "off"))
+    if "hostname" in FEATURES:   parts.append("hostname " + ("on" if cfg.hostname else "off"))
+    if "killswitch" in FEATURES: parts.append("kill switch " + ("on" if cfg.killswitch else "off"))
+    parts.append("country " + (cfg.country or "auto"))
+    return " · ".join(parts)
+
+def menu_lines(cfg):
+    L = banner_lines() + ["", col(W, "  Main menu"), ""]
+    items = [("1", "Start  (current settings)")]
+    if "killswitch" in FEATURES:
+        items.append(("2", "Start  (Tor only — no kill switch)"))
+    items += [("3", "Choose exit country"), ("4", "Settings"), ("5", "Status"),
+              ("6", "Panic — restore the system after a crash"), ("0", "Exit")]
+    for k, t in items:
+        L.append(f"   {col(Y, '[' + k + ']')} {t}")
+    L += ["", col(C, "  " + settings_summary(cfg))]
+    return L
+
+def settings_menu(cfg):
+    while True:
+        clear_screen(); banner()
+        onoff = lambda b: col(G, "on") if b else col(R, "off")
+        print(col(W, "  Settings\n"))
+        print(f"   {col(Y,'[1]')} Rotation interval : {col(W, str(cfg.interval) + 's')}")
+        if "mac" in FEATURES:        print(f"   {col(Y,'[2]')} Change MAC         : {onoff(cfg.mac)}")
+        if "hostname" in FEATURES:   print(f"   {col(Y,'[3]')} Random hostname    : {onoff(cfg.hostname)}")
+        if "killswitch" in FEATURES: print(f"   {col(Y,'[4]')} Kill switch        : {onoff(cfg.killswitch)}")
+        print(f"   {col(Y,'[0]')} Back")
+        try: ch = input(col(W, "\n  Select » ")).strip()
+        except (EOFError, KeyboardInterrupt): return
+        if ch == "1":
+            try:
+                v = int(input("  Seconds between rotations (min 10) » ").strip())
+                cfg.interval = max(10, v)
+            except (ValueError, EOFError, KeyboardInterrupt):
+                pass
+        elif ch == "2" and "mac" in FEATURES:        cfg.mac = not cfg.mac
+        elif ch == "3" and "hostname" in FEATURES:   cfg.hostname = not cfg.hostname
+        elif ch == "4" and "killswitch" in FEATURES: cfg.killswitch = not cfg.killswitch
+        elif ch == "0": return
+
+def run_menu(cfg, show_status, do_panic):
+    """Returns True when the user chose Start, False to exit."""
+    while True:
+        clear_screen()
+        print("\n".join(menu_lines(cfg)))
+        try: ch = input(col(W, "\n  Select » ")).strip()
+        except (EOFError, KeyboardInterrupt):
+            print(); return False
+        if ch == "1":
+            return True
+        if ch == "2" and "killswitch" in FEATURES:
+            cfg.killswitch = False
+            return True
+        if ch == "3": ask_country(cfg)
+        elif ch == "4": settings_menu(cfg)
+        elif ch in ("5", "6"):
+            clear_screen(); banner()
+            (show_status if ch == "5" else do_panic)()
+            try: input(col(DIM, "\n  Press Enter to return…"))
+            except (EOFError, KeyboardInterrupt): pass
+        elif ch == "0":
+            return False
+
+# ─── Live dashboard ────────────────────────────────────────────
+_ANSI = re.compile(r"\033\[[0-9;?]*[A-Za-z]")
+
+def wrap_items(items, width, indent="  ", sep="  "):
+    """Pack items (which may contain colour codes) into lines no wider than `width`."""
+    lines, cur, cur_len = [], [], 0
+    for it in items:
+        n = len(_ANSI.sub("", it))
+        if cur and len(indent) + cur_len + len(sep) + n > width:
+            lines.append(indent + sep.join(cur)); cur, cur_len = [], 0
+        cur_len += n + (len(sep) if cur else 0)
+        cur.append(it)
+    if cur: lines.append(indent + sep.join(cur))
+    return lines
+
+def dashboard_lines(D, cfg, extra, width):
+    narrow = width < 60
+    ip = D["ip"]
+    L = banner_lines() + [""]
+    if ip:
+        L.append(f"  {col(G,'●')} Tor {col(G,'CONNECTED')}")
+        L.append(f"  Exit IP       {col(W, ip)}")
+    else:
+        L.append(f"  {col(R,'●')} Tor {col(R,'NO CONNECTION')} — retrying…")
+    mode = "fixed" if cfg.country else "auto"
+    name = COUNTRY_NAMES.get(D["country"], "")
+    L.append(f"  Exit country  {col(W, D['country'])} {name} ({mode})")
+    if D["paused"]:
+        L.append(f"  Rotation      {col(Y, 'PAUSED')}")
+    else:
+        nxt = max(0, int(cfg.interval - (D["now"] - D["last_rot"])))
+        L.append(f"  Next rotation in {col(W, str(nxt) + 's')}" + ("" if narrow else f"   (every {cfg.interval}s)"))
+    checks = f"Checks {col(G, str(stats['ok']))} ok / {col(R if stats['fail'] else W, str(stats['fail']))} failed"
+    rots = f"Rotations {col(W, str(stats['rotations']))}"
+    if narrow:
+        L += ["  " + checks, "  " + rots]
+    else:
+        L.append(f"  {checks}   ·   {rots}")
+    for x in (extra or []):
+        L.append("  " + x)
+    L.append("")
+    if D["msg"] and D["now"] - D["msg_t"] < 10:
+        L.append(f"  {col(M, '›')} {D['msg']}")
+    else:
+        L.append("")
+    keys = [("n", "new identity"), ("r", "rotate country"), ("c", "choose country"),
+            ("p", "pause"), ("q", "quit")]
+    L += wrap_items([f"{col(Y, '[' + k + ']')} {t}" for k, t in keys], width)
+    return L
+
+def run_dashboard(real, cfg, current, restart_tor, extra_lines=None, on_tick=None):
+    D = {"ip": None, "msg": "", "msg_t": 0.0, "paused": False,
+         "country": current, "last_rot": time.time(), "now": time.time()}
+
+    def say(m): D["msg"], D["msg_t"] = m, time.time()
+
+    def monitor():
+        while not stop_evt.is_set():
+            ip = get_tor_ip()
+            if stop_evt.is_set(): break
+            stats["checks"] += 1
+            if ip:
+                stats["ok"] += 1; D["ip"] = ip
+            else:
+                stats["fail"] += 1; D["ip"] = None
+                if tor_lock.acquire(blocking=False):
+                    try:
+                        if not stop_evt.is_set():
+                            say("Tor unreachable — restarting it…")
+                            restart_tor()
+                    finally:
+                        tor_lock.release()
+            stop_evt.wait(CHECK_INTERVAL)
+
+    threading.Thread(target=monitor, daemon=True).start()
+
+    def apply_country(cc):
+        if not tor_lock.acquire(blocking=False):
+            say("Tor is busy (restarting) — try again in a moment")
+            return
+        try:
+            ok = set_exit_country(cc)
+        finally:
+            tor_lock.release()
+        D["last_rot"] = time.time()
+        if ok:
+            D["country"] = cc
+            stats["rotations"] += 1
+            stats["history"][cc] = stats["history"].get(cc, 0) + 1
+            say(f"Exit country → {cc} {COUNTRY_NAMES.get(cc, '')}")
+        else:
+            say("Could not change the exit country")
+
+    def timed_rotation():
+        if cfg.country:                   # fixed country: just build new circuits
+            D["last_rot"] = time.time()
+            stats["rotations"] += 1
+            say(f"New circuit (country fixed to {cfg.country})" if tor_newnym()
+                else "New identity failed")
+        else:
+            apply_country(pick_country(real, cfg))
+
+    clear_screen()
+    term_cbreak()
+    try:
+        while True:
+            D["now"] = time.time()
+            if on_tick: on_tick()
+            if not D["paused"] and D["now"] - D["last_rot"] >= cfg.interval:
+                timed_rotation()
+            L = dashboard_lines(D, cfg, extra_lines() if extra_lines else None, term_width())
+            sys.stdout.write("\033[H" + "".join(l + "\033[K\n" for l in L) + "\033[J")
+            sys.stdout.flush()
+
+            k = read_key(1.0).lower()
+            if k == "q":
+                break
+            elif k == "n":
+                say("New identity requested" if tor_newnym()
+                    else "New identity failed (Tor limits it to once per ~10 s)")
+            elif k == "r":
+                cfg.country = None
+                apply_country(pick_country(real, cfg))
+            elif k == "p":
+                D["paused"] = not D["paused"]
+                D["last_rot"] = time.time()
+                say("Rotation paused" if D["paused"] else "Rotation resumed")
+            elif k == "c":
+                restore_terminal()
+                changed = ask_country(cfg)
+                clear_screen(); term_cbreak()
+                if changed:
+                    apply_country(pick_country(real, cfg))
+                else:
+                    say("Country unchanged")
+    finally:
+        restore_terminal()
+
+
+# ─── Status ────────────────────────────────────────────────────
+def print_status():
+    if state.load(): print(json.dumps(state.d, indent=2))
+    else: print("No state.")
+
+def panic():
+    if state.load() and state.get("cleanup_pending"):
+        print(col(Y, "Recovering..."))
+        run(["pkill", "-f", f"{TOR_BIN} -f {TORRC}"])   # leftover tor from the crashed session
+        safe_cleanup()
+    print(col(G, "Done."))
+
+def restart_tor():
+    stop_tor()
+    start_tor()
+
+# ─── Session ───────────────────────────────────────────────────
+def start_session(cfg):
     check_deps()
 
     if state.load() and state.get("cleanup_pending"):
@@ -322,7 +643,7 @@ def main():
         run(["pkill", "-f", f"{TOR_BIN} -f {TORRC}"])
         safe_cleanup(verbose=False)
 
-    banner()
+    clear_screen(); banner()
 
     state.clear()
     state.set("session", datetime.now().isoformat())
@@ -332,7 +653,7 @@ def main():
     real = get_real_country()
     print(col(G, f"✓ Real country: {real}"))
 
-    current = rotate(real, first=True)
+    current = rotate(real, cfg, first=True)
     if not (tor_proc and tor_proc.poll() is None):
         print(col(R, "✗ Cannot start Tor"))
         safe_cleanup()
@@ -340,38 +661,40 @@ def main():
     stats["rotations"] = 1
     stats["history"][current] = 1
     wait_for_tor()
-    last = time.time()
-
     print(col(G, "\n✅ PhantomRoute active."))
-    print(col(C, f"  Route apps via SOCKS5 127.0.0.1:{SOCKS_PORT} (or torsocks).\n"))
+    print(col(C, f"  Route apps via SOCKS5 127.0.0.1:{SOCKS_PORT} (or torsocks)."))
     time.sleep(2)
 
-    while True:
-        os.system("clear")
-        banner()
-        stats["checks"] += 1
-        ip = get_tor_ip()
-        if ip:
-            stats["ok"] += 1
-            print(col(G, f"  ✓ Exit IP: {ip}"))
-            print(col(C, f"  Target: {current}  |  Uptime: {int(time.time()-last)}s"))
-        else:
-            stats["fail"] += 1
-            print(col(R, "  ✗ Tor unreachable — restarting..."))
-            if not (tor_proc and tor_proc.poll() is None):
-                start_tor()
-            else:
-                tor_newnym()
+    run_dashboard(real, cfg, current, restart_tor=restart_tor)   # keys: n r c p q
+    on_signal(None, None)
 
-        if time.time() - last >= args.interval:
-            current = rotate(real)
-            stats["rotations"] += 1
-            stats["history"][current] = stats["history"].get(current,0)+1
-            last = time.time()
+# ─── Main ──────────────────────────────────────────────────────
+def main():
+    parser = argparse.ArgumentParser(
+        prog=APP, description="Run without options for the interactive menu.")
+    parser.add_argument("--start", action="store_true", help="Start immediately (skip the menu)")
+    parser.add_argument("--panic", action="store_true", help="Recover crashed session")
+    parser.add_argument("--status", action="store_true", help="Show state")
+    parser.add_argument("--interval", type=int, default=CHANGE_INTERVAL,
+                        help="Seconds between rotations (min 10)")
+    parser.add_argument("--country", metavar="CC",
+                        help="Fix the exit country (2-letter code, e.g. DE)")
+    args = parser.parse_args()
 
-        nxt = max(0, int(args.interval - (time.time()-last)))
-        print(col(W, f"\n  ⏱  Next rotation in {nxt}s  |  Ctrl+C to stop"))
-        time.sleep(CHECK_INTERVAL)
+    if args.panic:  return panic()
+    if args.status: return print_status()
+
+    cfg = Cfg(max(10, args.interval))
+    if args.country:
+        cc = args.country.strip().upper()
+        if len(cc) != 2 or not cc.isalpha():
+            parser.error("--country needs a 2-letter code, e.g. DE")
+        cfg.country = cc
+
+    interactive = len(sys.argv) == 1 and sys.stdin.isatty() and sys.stdout.isatty()
+    if interactive and not run_menu(cfg, print_status, panic):
+        return
+    start_session(cfg)
 
 if __name__ == "__main__":
     try:
